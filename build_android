@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# FFmpeg source dir path
+FFMPEG_SRC=$(pwd)
+# Build output dir path
+BUILD_DIR=$(pwd)/build/android
+# Avaliable NDK prebuilt tools for host OS
+HOST_ARCH=darwin-x86_64 # macOS
+
+# Set up the environment variables
+# IMPORTANT: You have to set the ANDROID_NDK_ROOT system environment variable in terminal by yourself as follow...
+# zsh: echo "export ANDROID_NDK_ROOT=\"path/to/android/sdk/ndk/version\"" >> $HOME/.zshrc && source $HOME/.zshrc
+# bash: echo "export ANDROID_NDK_ROOT=\"path/to/android/sdk/ndk/version\"" >> $HOME/.bashrc && source $HOME/.bashrc
+export PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$HOST_ARCH/bin:$PATH
+export SYSROOT=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$HOST_ARCH/sysroot
+# export CROSS_PREFIX=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$HOST_ARCH/bin/
+
+# Remove old build output dir
+rm -rf ./build
+
+# Build libavcodec
+# arm
+ARCH=arm
+API_LEVEL=21
+ABI=armv7a
+TOOLCHAIN=armv7a-linux-androideabi
+OUTPUT_DIR=$BUILD_DIR/$ABI
+mkdir -p $OUTPUT_DIR
+cd $FFMPEG_SRC
+make clean
+./configure \
+    --prefix=$OUTPUT_DIR \
+    --target-os=android \
+    --arch=$ARCH \
+    --cc=$TOOLCHAIN$API_LEVEL-clang \
+    --sysroot=$SYSROOT \
+    --enable-shared \
+    --disable-static \
+    --disable-doc \
+    --disable-programs \
+    --disable-avdevice \
+    --disable-symver \
+    --enable-libx264 \
+    --enable-cross-compile
+make -j8
+# make install
+
+# arm64
+ARCH=arm64
+API_LEVEL=21
+ABI=armv64-v8a
+TOOLCHAIN=aarch64-linux-android
+OUTPUT_DIR=$BUILD_DIR/$ABI
+mkdir -p $OUTPUT_DIR
+cd $FFMPEG_SRC
+make clean
+./configure \
+    --prefix=$OUTPUT_DIR \
+    --target-os=android \
+    --arch=$ARCH \
+    --cc=$TOOLCHAIN$API_LEVEL-clang \
+    --sysroot=$SYSROOT \
+    --enable-shared \
+    --disable-static \
+    --disable-doc \
+    --disable-programs \
+    --disable-avdevice \
+    --disable-symver \
+    --enable-libx264 \
+    --enable-cross-compile
+make -j8
+# make install
+
+# x86
+ARCH=x86
+API_LEVEL=21
+ABI=x86
+TOOLCHAIN=i686-linux-android
+OUTPUT_DIR=$BUILD_DIR/$ABI
+mkdir -p $OUTPUT_DIR
+cd $FFMPEG_SRC
+make clean
+./configure \
+    --prefix=$OUTPUT_DIR \
+    --target-os=android \
+    --arch=$ARCH \
+    --cc=$TOOLCHAIN$API_LEVEL-clang \
+    --sysroot=$SYSROOT \
+    --enable-shared \
+    --disable-static \
+    --disable-doc \
+    --disable-programs \
+    --disable-avdevice \
+    --disable-symver \
+    --enable-libx264 \
+    --enable-cross-compile
+make -j8
+# make install
+
+# x86_64
+ARCH=x86_64
+API_LEVEL=21
+ABI=x86_64
+TOOLCHAIN=x86_64-linux-android
+OUTPUT_DIR=$BUILD_DIR/$ABI
+mkdir -p $OUTPUT_DIR
+cd $FFMPEG_SRC
+make clean
+./configure \
+    --prefix=$OUTPUT_DIR \
+    --target-os=android \
+    --arch=$ARCH \
+    --cc=$TOOLCHAIN$API_LEVEL-clang \
+    --sysroot=$SYSROOT \
+    --enable-shared \
+    --disable-static \
+    --disable-doc \
+    --disable-programs \
+    --disable-avdevice \
+    --disable-symver \
+    --enable-libx264 \
+    --enable-cross-compile
+make -j8
+# make install
