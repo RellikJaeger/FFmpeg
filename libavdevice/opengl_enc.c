@@ -1201,6 +1201,10 @@ static int opengl_draw(AVFormatContext *h, void *input, int repaint, int is_pkt)
     int ret;
 
 #if CONFIG_SDL2
+    /* At this point, opengl->glcontext implies opengl->glcontext */
+    if (opengl->glcontext)
+        SDL_GL_MakeCurrent(opengl->window, opengl->glcontext);
+
     if (!opengl->no_window && (ret = opengl_sdl_process_events(h)) < 0)
         goto fail;
 #endif

@@ -17,6 +17,7 @@
  */
 
 #include "hevcdec.h"
+#include "hevc_data.h"
 #include "hevc_ps.h"
 
 #include "vulkan_decode.h"
@@ -205,6 +206,43 @@ static StdVideoH265LevelIdc convert_to_vk_level_idc(int level_idc)
     }
 }
 
+static void copy_scaling_list(const ScalingList *sl, StdVideoH265ScalingLists *vksl)
+{
+    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_4X4_NUM_LISTS; i++) {
+        for (int j = 0; j < STD_VIDEO_H265_SCALING_LIST_4X4_NUM_ELEMENTS; j++) {
+            uint8_t pos = 4 * ff_hevc_diag_scan4x4_y[j] + ff_hevc_diag_scan4x4_x[j];
+            vksl->ScalingList4x4[i][j] = sl->sl[0][i][pos];
+        }
+    }
+
+    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_8X8_NUM_LISTS; i++) {
+        for (int j = 0; j < STD_VIDEO_H265_SCALING_LIST_8X8_NUM_ELEMENTS; j++) {
+            uint8_t pos = 8 * ff_hevc_diag_scan8x8_y[j] + ff_hevc_diag_scan8x8_x[j];
+            vksl->ScalingList8x8[i][j] = sl->sl[1][i][pos];
+        }
+    }
+
+    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS; i++) {
+        for (int j = 0; j < STD_VIDEO_H265_SCALING_LIST_16X16_NUM_ELEMENTS; j++) {
+            uint8_t pos = 8 * ff_hevc_diag_scan8x8_y[j] + ff_hevc_diag_scan8x8_x[j];
+            vksl->ScalingList16x16[i][j] = sl->sl[2][i][pos];
+        }
+    }
+
+    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS; i++) {
+        for (int j = 0; j < STD_VIDEO_H265_SCALING_LIST_32X32_NUM_ELEMENTS; j++) {
+            uint8_t pos = 8 * ff_hevc_diag_scan8x8_y[j] + ff_hevc_diag_scan8x8_x[j];
+            vksl->ScalingList32x32[i][j] = sl->sl[3][i * 3][pos];
+        }
+    }
+
+    memcpy(vksl->ScalingListDCCoef16x16, sl->sl_dc[0],
+           STD_VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS * sizeof(*vksl->ScalingListDCCoef16x16));
+
+    for (int i = 0; i <  STD_VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS; i++)
+        vksl->ScalingListDCCoef32x32[i] = sl->sl_dc[1][i * 3];
+}
+
 static void set_sps(const HEVCSPS *sps, int sps_idx,
                     StdVideoH265ScalingLists *vksps_scaling,
                     StdVideoH265HrdParameters *vksps_vui_header,
@@ -218,27 +256,7 @@ static void set_sps(const HEVCSPS *sps, int sps_idx,
                     StdVideoH265ShortTermRefPicSet *str,
                     StdVideoH265LongTermRefPicsSps *ltr)
 {
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_4X4_NUM_LISTS; i++)
-        memcpy(vksps_scaling->ScalingList4x4[i], sps->scaling_list.sl[0][i],
-               STD_VIDEO_H265_SCALING_LIST_4X4_NUM_ELEMENTS * sizeof(**vksps_scaling->ScalingList4x4));
-
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_8X8_NUM_LISTS; i++)
-        memcpy(vksps_scaling->ScalingList8x8[i], sps->scaling_list.sl[1][i],
-               STD_VIDEO_H265_SCALING_LIST_8X8_NUM_ELEMENTS * sizeof(**vksps_scaling->ScalingList8x8));
-
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS; i++)
-        memcpy(vksps_scaling->ScalingList16x16[i], sps->scaling_list.sl[2][i],
-               STD_VIDEO_H265_SCALING_LIST_16X16_NUM_ELEMENTS * sizeof(**vksps_scaling->ScalingList16x16));
-
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS; i++)
-        memcpy(vksps_scaling->ScalingList32x32[i], sps->scaling_list.sl[3][i * 3],
-               STD_VIDEO_H265_SCALING_LIST_32X32_NUM_ELEMENTS * sizeof(**vksps_scaling->ScalingList32x32));
-
-    memcpy(vksps_scaling->ScalingListDCCoef16x16, sps->scaling_list.sl_dc[0],
-           STD_VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS * sizeof(*vksps_scaling->ScalingListDCCoef16x16));
-
-    for (int i = 0; i <  STD_VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS; i++)
-        vksps_scaling->ScalingListDCCoef32x32[i] = sps->scaling_list.sl_dc[1][i * 3];
+    copy_scaling_list(&sps->scaling_list, vksps_scaling);
 
     *vksps_vui_header = (StdVideoH265HrdParameters) {
         .flags = (StdVideoH265HrdFlags) {
@@ -464,27 +482,7 @@ static void set_pps(const HEVCPPS *pps, const HEVCSPS *sps,
                     StdVideoH265PictureParameterSet *vkpps,
                     StdVideoH265PredictorPaletteEntries *pal)
 {
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_4X4_NUM_LISTS; i++)
-        memcpy(vkpps_scaling->ScalingList4x4[i], pps->scaling_list.sl[0][i],
-               STD_VIDEO_H265_SCALING_LIST_4X4_NUM_ELEMENTS * sizeof(**vkpps_scaling->ScalingList4x4));
-
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_8X8_NUM_LISTS; i++)
-        memcpy(vkpps_scaling->ScalingList8x8[i], pps->scaling_list.sl[1][i],
-               STD_VIDEO_H265_SCALING_LIST_8X8_NUM_ELEMENTS * sizeof(**vkpps_scaling->ScalingList8x8));
-
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS; i++)
-        memcpy(vkpps_scaling->ScalingList16x16[i], pps->scaling_list.sl[2][i],
-               STD_VIDEO_H265_SCALING_LIST_16X16_NUM_ELEMENTS * sizeof(**vkpps_scaling->ScalingList16x16));
-
-    for (int i = 0; i < STD_VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS; i++)
-        memcpy(vkpps_scaling->ScalingList32x32[i], pps->scaling_list.sl[3][i * 3],
-               STD_VIDEO_H265_SCALING_LIST_32X32_NUM_ELEMENTS * sizeof(**vkpps_scaling->ScalingList32x32));
-
-    memcpy(vkpps_scaling->ScalingListDCCoef16x16, pps->scaling_list.sl_dc[0],
-           STD_VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS * sizeof(*vkpps_scaling->ScalingListDCCoef16x16));
-
-    for (int i = 0; i <  STD_VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS; i++)
-        vkpps_scaling->ScalingListDCCoef32x32[i] = sps->scaling_list.sl_dc[1][i * 3];
+    copy_scaling_list(&pps->scaling_list, vkpps_scaling);
 
     *vkpps = (StdVideoH265PictureParameterSet) {
         .flags = (StdVideoH265PpsFlags) {
@@ -767,12 +765,10 @@ static int vk_hevc_start_frame(AVCodecContext          *avctx,
     const HEVCPPS *pps = h->ps.pps;
     int nb_refs = 0;
 
-    if (!dec->session_params || dec->params_changed) {
-        av_buffer_unref(&dec->session_params);
+    if (!dec->session_params) {
         err = vk_hevc_create_params(avctx, &dec->session_params);
         if (err < 0)
             return err;
-        dec->params_changed = 0;
     }
 
     hp->h265pic = (StdVideoDecodeH265PictureInfo) {
@@ -855,7 +851,6 @@ static int vk_hevc_start_frame(AVCodecContext          *avctx,
         .sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H265_PICTURE_INFO_KHR,
         .pStdPictureInfo = &hp->h265pic,
         .sliceSegmentCount = 0,
-        .pSliceSegmentOffsets = vp->slice_off,
     };
 
     vp->decode_info = (VkVideoDecodeInfoKHR) {
@@ -897,11 +892,41 @@ static int vk_hevc_decode_slice(AVCodecContext *avctx,
 static int vk_hevc_end_frame(AVCodecContext *avctx)
 {
     const HEVCContext *h = avctx->priv_data;
+    FFVulkanDecodeContext *dec = avctx->internal->hwaccel_priv_data;
     HEVCFrame *pic = h->ref;
     HEVCVulkanDecodePicture *hp = pic->hwaccel_picture_private;
     FFVulkanDecodePicture *vp = &hp->vp;
     FFVulkanDecodePicture *rvp[HEVC_MAX_REFS] = { 0 };
     AVFrame *rav[HEVC_MAX_REFS] = { 0 };
+    int err;
+
+    if (!hp->h265_pic_info.sliceSegmentCount)
+        return 0;
+
+    if (!dec->session_params) {
+        const HEVCSPS *sps = h->ps.sps;
+        const HEVCPPS *pps = h->ps.pps;
+
+        if (!pps) {
+            unsigned int pps_id = h->sh.pps_id;
+            if (pps_id < HEVC_MAX_PPS_COUNT && h->ps.pps_list[pps_id] != NULL)
+                pps = (const HEVCPPS *)h->ps.pps_list[pps_id]->data;
+        }
+
+        if (!pps) {
+            av_log(avctx, AV_LOG_ERROR,
+                   "Encountered frame without a valid active PPS reference.\n");
+            return AVERROR_INVALIDDATA;
+        }
+
+        err = vk_hevc_create_params(avctx, &dec->session_params);
+        if (err < 0)
+            return err;
+
+        hp->h265pic.sps_video_parameter_set_id = sps->vps_id;
+        hp->h265pic.pps_seq_parameter_set_id = pps->sps_id;
+        hp->h265pic.pps_pic_parameter_set_id = pps->pps_id;
+    }
 
     for (int i = 0; i < vp->decode_info.referenceSlotCount; i++) {
         HEVCVulkanDecodePicture *rfhp = hp->ref_src[i]->hwaccel_picture_private;
@@ -939,7 +964,7 @@ const AVHWAccel ff_hevc_vulkan_hwaccel = {
     .frame_priv_data_size  = sizeof(HEVCVulkanDecodePicture),
     .init                  = &ff_vk_decode_init,
     .update_thread_context = &ff_vk_update_thread_context,
-    .decode_params         = &ff_vk_params_changed,
+    .decode_params         = &ff_vk_params_invalidate,
     .flush                 = &ff_vk_decode_flush,
     .uninit                = &ff_vk_decode_uninit,
     .frame_params          = &ff_vk_frame_params,
