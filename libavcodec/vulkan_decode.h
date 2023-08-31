@@ -20,14 +20,14 @@
 #define AVCODEC_VULKAN_DECODE_H
 
 #include "decode.h"
-#include "hwconfig.h"
+#include "hwaccel_internal.h"
 #include "internal.h"
 
 #include "vulkan_video.h"
 
 typedef struct FFVulkanDecodeProfileData {
     VkVideoDecodeH264ProfileInfoKHR h264_profile;
-    VkVideoDecodeH264ProfileInfoKHR h265_profile;
+    VkVideoDecodeH265ProfileInfoKHR h265_profile;
     VkVideoDecodeAV1ProfileInfoMESA av1_profile;
     VkVideoDecodeUsageInfoKHR usage;
     VkVideoProfileInfoKHR profile;
